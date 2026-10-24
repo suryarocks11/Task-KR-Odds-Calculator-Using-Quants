@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Single-file, offline OKR forecasting calculator: Monte Carlo completion odds, PERT critical path and binomial tests. Built by Surya Gupta.">
+<title>OKR Odds Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a working calculator. Tabs per method; setup left, results right; wide tables scroll inside their own box. */
+:root{
+  --bg:#FFFFFF; --panel:#FFFFFF; --ink:#111113; --muted:#5E6168; --line:#E1E3E7; --soft:#F3F4F6;
+  --navy:#0A0A0B; --accent:#0E7C86; --accent-soft:#EAF5F6; --on-accent:#FFFFFF;
+  --good:#2E8B57; --warn:#B87A16; --bad:#C94040;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#000000; --panel:#0D0D0F; --ink:#F2F2F3; --muted:#A1A3AA; --line:#2A2B30; --soft:#18191C;
+  --navy:#FFFFFF; --accent:#4FC3CB; --accent-soft:#10292B; --on-accent:#000000; --good:#5CC48A; --warn:#E8B04E; --bad:#F07A7A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#000000; --panel:#0D0D0F; --ink:#F2F2F3; --muted:#A1A3AA; --line:#2A2B30; --soft:#18191C;
+  --navy:#FFFFFF; --accent:#4FC3CB; --accent-soft:#10292B; --on-accent:#000000; --good:#5CC48A; --warn:#E8B04E; --bad:#F07A7A; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-direction:column;gap:6px}
+[hidden]{display:none!important}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.printonly{display:none}
+.toprow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.switch{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 12px 4px 4px;font:500 13px var(--sans);color:var(--ink);cursor:pointer}
+.switch:hover{border-color:var(--ink)}
+.switch .track{width:38px;height:22px;border-radius:999px;background:var(--soft);border:1px solid var(--line);position:relative;flex:none}
+.switch .knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--ink)}
+.switch[aria-checked="true"] .knob{left:18px}
+@media (prefers-reduced-motion:no-preference){.switch .knob{transition:left .15s}}
+.eyebrow{font:600 12px/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(23px,3.2vw,31px);line-height:1.15;margin:0;color:var(--navy);text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:76ch}
+a{color:var(--accent)}
+nav{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+nav button{font:500 14px var(--sans);color:var(--muted);background:none;border:0;border-bottom:3px solid transparent;padding:10px 13px;cursor:pointer}
+nav button[aria-selected="true"]{color:var(--navy);border-bottom-color:var(--accent);font-weight:600}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.banner{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--accent-soft);border-radius:6px;padding:10px 14px;font-size:14px}
+.grid{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stack{display:flex;flex-direction:column;gap:18px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+h2{font-size:16px;margin:0;color:var(--navy)}
+h3{font-size:12.5px;margin:0;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input[type=number],input[type=date],input[type=text],select,textarea{font:500 14px var(--mono);color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:6px 8px;width:100%;font-variant-numeric:tabular-nums}
+input[type=text]{font-family:var(--sans)}
+textarea{min-height:110px;font-size:12.5px;resize:vertical}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;color:var(--ink)}
+.check input{accent-color:var(--accent);width:16px;height:16px;margin-top:3px}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+button.b{font:500 13px var(--sans);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:5px;padding:6px 10px;cursor:pointer}
+button.b:hover{border-color:var(--accent)}
+button.x{font:600 13px var(--sans);border:0;background:none;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:4px}
+button.x:hover{color:var(--bad);background:var(--soft)}
+button.primary{font:600 14px var(--sans);background:var(--navy);color:var(--panel);border:0;border-radius:6px;padding:9px 14px;cursor:pointer}
+.risk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--soft)}
+.risk input[type=text],.risk select{background:var(--panel)}
+.risk .rr{display:flex;align-items:center;gap:8px;grid-column:1/-1}
+.risk input[type=range]{flex:1;accent-color:var(--accent)}
+.val{font:600 14px var(--mono);min-width:3.2em;text-align:right;font-variant-numeric:tabular-nums}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.tile{background:var(--soft);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile b{font:600 25px/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.tile span{font-size:12.5px;color:var(--muted)}
+.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.nv{color:var(--navy)}
+.chart{width:100%;height:auto;display:block}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+th{font-weight:600;color:var(--muted);background:var(--soft);position:sticky;top:0;z-index:1;font-size:12px;line-height:1.25}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+td input[type=number]{width:4.4em;padding:3px 5px;font-size:13px;text-align:right}
+td input.id{width:4.6em;font-weight:600;color:var(--navy)}
+td input.nm{width:15em}
+.pbar{display:inline-block;height:8px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.note{font-size:13px;color:var(--muted);margin:0;max-width:80ch}
+.hint{font-size:12px;color:var(--muted)}
+.status{font-size:12.5px;color:var(--accent);min-height:1.2em}
+.formula{font:12.5px/1.6 var(--mono);background:var(--soft);border-radius:6px;padding:10px 12px;overflow-x:auto;white-space:pre;color:var(--ink);margin:0}
+.verdict{border-left:4px solid var(--accent);background:var(--accent-soft);padding:10px 12px;border-radius:0 6px 6px 0;font-size:14px}
+.verdict.badv{border-color:var(--bad)}.verdict.goodv{border-color:var(--good)}
+details{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--panel)}
+details>summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--navy)}
+details[open]>summary{margin-bottom:10px}
+details .inner{display:flex;flex-direction:column;gap:10px}
+tr.sel td{background:var(--accent-soft)}
+/* how-to */
+.guide{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:820px){.guide{grid-template-columns:minmax(0,1fr)}.toc{position:static!important}}
+.toc{position:sticky;top:12px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.toc a{text-decoration:none;color:var(--muted);padding:3px 0}
+.toc a:hover{color:var(--accent)}
+.doc{display:flex;flex-direction:column;gap:26px;min-width:0}
+.doc section{display:flex;flex-direction:column;gap:10px}
+.doc h2{font-size:20px}
+.doc p,.doc li{max-width:72ch}
+.doc p{margin:0}
+.doc ol,.doc ul{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:8px;padding:14px;background:var(--panel);display:flex;flex-direction:column;gap:6px}
+.card b{color:var(--navy)}
+.card .q{font-style:italic;color:var(--muted);font-size:14px}
+dl{margin:0;display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr);gap:8px 18px}
+dt{font-weight:600;color:var(--navy)}
+dd{margin:0;color:var(--ink)}
+@media (max-width:560px){dl{grid-template-columns:minmax(0,1fr)}dd{margin-bottom:6px}}
+.scale td:first-child{font-family:var(--mono);font-weight:600}
+.credit{display:flex;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:14px;margin-top:8px;font-size:13px;color:var(--muted)}
+.credit b{color:var(--ink);font-weight:600}
+@media print{
+  :root:root:root{--bg:#FFFFFF;--panel:#FFFFFF;--ink:#111113;--muted:#55585F;--line:#D5D7DC;--soft:#F3F4F6;--navy:#000000;--accent:#0E7C86;--accent-soft:#EAF5F6;--on-accent:#FFFFFF;--good:#2E8B57;--warn:#B87A16;--bad:#C94040;color-scheme:light}
+  @page{margin:14mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{padding:0;font-size:11pt;background:#fff}
+  .wrap{max-width:none;gap:12px}
+  nav,.banner,.btns,button,details,.tools,.toc,.noprint,textarea,.status,#hSub{display:none!important}
+  .printonly{display:block;font-size:10pt;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:6px}
+  .grid,.guide{grid-template-columns:minmax(0,1fr);gap:12px}
+  .panel{break-inside:avoid;padding:12px;gap:10px}
+  .panel:has(#krt){break-inside:auto}
+  .tablewrap{max-height:none!important;overflow:visible;border:none}
+  table{font-size:8.5pt}
+  th{position:static}
+  tr{break-inside:avoid}
+  input:not([type=checkbox]),select{border:none!important;background:transparent!important;padding:0!important;font-size:inherit;width:auto!important;appearance:none;-webkit-appearance:none}
+  .grid>:last-child{order:-1}
+  input[type=range]{display:none}
+  td input.nm{width:auto!important}
+  .tile b{font-size:18pt}
+  .chart{max-height:7cm}
+  h1{font-size:18pt}
+  .credit{break-inside:avoid}
+}
+.byline{font-size:12.5px;color:var(--muted)}
+.byline b{color:var(--ink);font-weight:600}
+.qg{display:grid;grid-template-columns:minmax(0,1fr) 5.2em 5.2em;gap:8px 10px;align-items:end;padding:10px 12px;border-radius:6px;background:var(--soft)}
+.qg .lab{display:flex;flex-direction:column;gap:1px;min-width:0}
+.qg .lab b{display:flex;align-items:center;gap:8px;color:var(--ink)}
+.qg label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.qg input{background:var(--panel)}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.qans{font-size:clamp(18px,2.2vw,21px);line-height:1.4;color:var(--navy);margin:0;font-weight:500;text-wrap:pretty}
+.qans strong{font-family:var(--mono);font-weight:600}
+.qaff{display:flex;gap:14px;flex-wrap:wrap}
+.qtot{display:grid;grid-template-columns:9em minmax(0,1fr);gap:12px;align-items:end;padding:12px;border:1px solid var(--accent);border-radius:6px;background:var(--accent-soft)}
+.qtot input{font-size:18px;font-weight:600;background:var(--panel)}
+.wins{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+@media (prefers-reduced-motion:no-preference){button.b,nav button{transition:color .15s,border-color .15s,background .15s}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+<header>
+  <div class="toprow">
+    <div class="eyebrow" id="hEyebrow">OKR Odds Calculator</div>
+    <div class="tools">
+      <button class="b" id="pdfBtn" hidden>Save as PDF</button>
+      <button class="switch" id="themeSw" role="switch" aria-checked="false" aria-label="Dark mode"><span class="track"><span class="knob"></span></span><span>Dark mode</span></button>
+    </div>
+  </div>
+  <h1 id="hTitle">How likely are you to hit your OKRs?</h1>
+  <p id="hSub">Put in your key results and how confident you are in each. The calculator simulates the quarter thousands of times and tells you what to expect.</p>
+  <span class="byline">Built by <b>Surya Gupta</b></span>
+  <div class="printonly" id="printHead"></div>
+</header>
+
+<nav role="tablist" aria-label="Sections">
+  <button role="tab" id="t-howto" aria-selected="false" data-tab="howto">How to use</button>
+  <button role="tab" id="t-quick" aria-selected="false" data-tab="quick">Quick calculator</button>
+  <button role="tab" id="t-odds" aria-selected="true" data-tab="odds">Completion odds</button>
+  <button role="tab" id="t-pert" aria-selected="false" data-tab="pert">Critical path (PERT)</button>
+  <button role="tab" id="t-warning" aria-selected="false" data-tab="warning">Weekly check</button>
+  <button role="tab" id="t-proof" aria-selected="false" data-tab="proof">Target proof test</button>
+</nav>
+
+<!-- =================== HOW TO USE =================== -->
+<section id="howto" class="tabpane" hidden>
+<div class="guide">
+  <div class="toc" aria-label="On this page">
+    <a href="#g-what">What it does</a>
+    <a href="#g-tools">The tools</a>
+    <a href="#g-start">Quick start</a>
+    <a href="#g-inputs">Choosing good inputs</a>
+    <a href="#g-read">Reading the results</a>
+    <a href="#g-share">Saving and sharing</a>
+    <a href="#g-example">Worked example</a>
+    <a href="#g-limits">Limits</a>
+  </div>
+  <div class="doc">
+    <section id="g-what">
+      <h2>What it does</h2>
+      <p>A plan says "all 33 KRs by the end of the quarter". Reality is a range. This calculator turns your confidence in each key result into an honest forecast: how many KRs you should expect to land, how likely you are to hit your target, and which items or risks move the answer most.</p>
+      <p><b>KR or task?</b> A key result (KR) is an outcome the OKR commits to, such as "40% of users active weekly". Tasks are the pieces of work that deliver it, like Jira sub-tasks. Count whatever you report on: KRs for an OKR review, tasks or deliverables for a sprint or project. Pick it in <i>What are you counting?</i> and the labels change to match.</p>
+      <p>It works for any OKR, project or delivery plan with a list of items and a deadline. The page opens with an example plan loaded (a made-up Customer Platform Launch) so you can see it working. Replace it with your own.</p>
+    </section>
+
+    <section id="g-tools">
+      <h2>The tools</h2>
+      <div class="cards">
+        <div class="card"><b>Quick calculator</b><span class="q">"Roughly, are we OK?"</span><span>Sort your KRs into Safe, Likely and At risk. You get an answer in a minute, no setup needed.</span></div>
+        <div class="card"><b>Completion odds</b><span class="q">"How many KRs will we land, and how likely is our target?"</span><span>Monte Carlo simulation of the whole OKR, including risks that hit several KRs at once.</span></div>
+        <div class="card"><b>Critical path (PERT)</b><span class="q">"Will the longest chain of dependent work finish in time?"</span><span>Three-point estimates per step give a chance of finishing by your date.</span></div>
+        <div class="card"><b>Weekly check</b><span class="q">"We finished 5 of 8 tasks this week. Should I escalate?"</span><span>A simple hypothesis test that separates a normal bad week from a real slip.</span></div>
+        <div class="card"><b>Target proof test</b><span class="q">"Does our sample prove we hit 40%?"</span><span>For rate-based KRs, such as "40% of records meet the standard": how many conforming items you need in a sample to claim the target.</span></div>
+      </div>
+    </section>
+
+    <section id="g-start">
+      <h2>Quick start (10 minutes)</h2>
+      <p>Need a rough answer first? Open <i>Quick calculator</i>, type how many KRs are Safe, Likely and At risk, and read the answer. <i>Open in full calculator</i> turns it into a starting setup for the steps below.</p>
+      <ol>
+        <li><b>Name it.</b> On <i>Completion odds</i>, type your OKR name and deadline under <i>Your plan</i>, and choose what you are counting.</li>
+        <li><b>Set how many there are.</b> Type the number in <i>How many in total</i> and press <i>Update total</i> to add or remove rows. Then set <i>How many must land</i>; it cannot be more than the total.</li>
+        <li><b>Name your KRs.</b> Edit the table directly, use <i>Add KR</i>, or open <i>Paste KRs from Excel</i> and paste three columns: ID, name, chance (%). <i>Start blank</i> clears the example.</li>
+        <li><b>Set a chance for each KR.</b> Your honest probability that it is approved by the deadline if nothing unusual goes wrong. Use the scale in <a href="#g-inputs">Choosing good inputs</a>.</li>
+        <li><b>Add shared risks.</b> These are things that would hit several KRs at once, such as "API access granted on time" or "business owners respond". Give each a probability. Then, in the KR table, put the chance a KR keeps if that risk goes wrong (for example 60 means a 90% KR drops to 54%). Leave it blank if the risk does not affect that KR.</li>
+        <li><b>Read the result and compare scenarios.</b> The numbers update as you type. Press <i>Compare scenarios</i> to see which risk is worth fixing first, then <i>Copy summary</i> to paste the result into an email or Teams.</li>
+      </ol>
+    </section>
+
+    <section id="g-inputs">
+      <h2>Choosing good inputs</h2>
+      <p>Use the same scale across the team so numbers mean the same thing.</p>
+      <div class="tablewrap"><table class="scale">
+        <thead><tr><th>Chance</th><th>Use it when</th></tr></thead>
+        <tbody>
+          <tr><td>95–98%</td><td>Routine or already mostly done; only an accident stops it.</td></tr>
+          <tr><td>90%</td><td>Clear plan, clear owner, no outside dependency.</td></tr>
+          <tr><td>80–85%</td><td>Depends on one other team, a licence or a sign-off you do not control.</td></tr>
+          <tr><td>70–75%</td><td>Several dependencies, or the target is a stretch from today's baseline.</td></tr>
+          <tr><td>≤ 60%</td><td>Needs things to go right that have gone wrong before. Consider rewording the KR.</td></tr>
+        </tbody></table></div>
+      <ul>
+        <li><b>Shared risk probability:</b> the chance the risk goes your way (for example "partner API access by week 4": 75%).</li>
+        <li><b>Chance kept if the risk fails:</b> a percentage of the KR's own chance. 100 or blank means no effect; 50 halves it; 0 means the KR cannot happen.</li>
+        <li><b>The risk is a KR itself:</b> if a KR succeeds exactly when the risk goes well (in the example, B3 Partner API integration), pick it in <i>Is also KR</i>. That KR then follows the risk.</li>
+        <li><b>Chance if scope change refused:</b> optional. If you have asked to reword some KRs, put the lower chance they would have unchanged, then untick <i>Scope or rewording accepted</i> to see the difference.</li>
+      </ul>
+    </section>
+
+    <section id="g-read">
+      <h2>Reading the results</h2>
+      <dl>
+        <dt>Expected KRs</dt><dd>The average number landed across all simulated quarters. Report this as your forecast, not the plan's total.</dd>
+        <dt>Chance of at least N</dt><dd>Share of simulated quarters that hit the target you set. Green is 90% or above, amber 80–89%, red below 80%.</dd>
+        <dt>P10 – P50 – P90</dt><dd>A bad quarter, a typical quarter and a good quarter. 80% of outcomes fall between P10 and P90.</dd>
+        <dt>Independent check</dt><dd>The same KRs with no shared risks. The gap between this and the simulation is how much correlated risk costs you.</dd>
+        <dt>Result per KR</dt><dd>Each KR's chance once shared risks are included. Sort by it to find the KRs to protect.</dd>
+        <dt>Scenario comparison</dt><dd>Re-runs the model with one risk removed at a time. The biggest jump is the risk to fix first.</dd>
+        <dt>PERT z and chance</dt><dd>How many standard deviations of slack you have, and the chance the chain finishes by the date.</dd>
+        <dt>p-value and α</dt><dd>The p-value is how surprising the result would be if things were on plan (weekly check) or if the target were not met (proof test). If it is at or below α (usually 0.05), act on it.</dd>
+      </dl>
+    </section>
+
+    <section id="g-share">
+      <h2>Saving and sharing</h2>
+      <ul>
+        <li>Your setup is saved in this browser automatically. Nobody else can see it, and it is not sent anywhere.</li>
+        <li>To give your setup to a colleague, open <i>Share or back up this setup</i>, press <i>Copy setup</i>, and send them the text. They paste it into the same box and press <i>Load setup</i>.</li>
+        <li><i>Copy summary</i> gives a short plain-text result for status reports.</li>
+        <li><b>Save as PDF:</b> in the downloaded HTML file, press <i>Save as PDF</i> at the top right, then choose <i>Save as PDF</i> (or <i>Microsoft Print to PDF</i>) as the printer. It saves the tab you are on as a clean light report. The button does not show on the online page, because printing is blocked there.</li>
+        <li><i>Load example</i> brings back the Customer Platform Launch example at any time.</li>
+      </ul>
+    </section>
+
+    <section id="g-example">
+      <h2>Worked example (loaded by default)</h2>
+      <p>The made-up Customer Platform Launch has 33 KRs across seven objectives, 3 shared risks and an end-of-quarter deadline. B3 (Partner API integration) is both a KR and a shared risk at 75%, because the data pipeline (C3), real-time metrics (B4), integration monitoring (D4), partner feeds (D5) and the single customer view (B5) all depend on it.</p>
+      <p>Result with 200,000 runs: 29.3 of 33 expected, 89% chance of at least 27 (80%), 51% chance of at least 30, about 4% chance of all 33. Fixing B3 alone lifts the expected total to 30.0; fixing all three risks lifts it to 30.5.</p>
+    </section>
+
+    <section id="g-limits">
+      <h2>Limits</h2>
+      <ul>
+        <li>The output is only as good as the chances you put in. Revisit them every week as evidence comes in.</li>
+        <li>Shared risks are either "went well" or "went badly" for the whole quarter. Partial slips are approximated by the chance kept.</li>
+        <li>PERT assumes steps run one after another and the total is roughly normal. Treat results below 50% as "will probably slip".</li>
+        <li>This is a planning aid, not a commitment. Use it to decide what to escalate, reword or protect.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+</section>
+
+<!-- =================== QUICK =================== -->
+<section id="quick" class="tabpane" hidden>
+<div class="grid">
+  <div class="panel">
+    <h2>Your <span class="u2">KRs</span> in three groups</h2>
+    <p class="note">Type your total, then say how many fall in each group. Keep the suggested chances, or change them to match your team's scale.</p>
+    <div class="qtot">
+      <label class="f" for="qTot"><span>Total <span class="u2">KRs</span></span><input type="number" id="qTot" min="0" max="1500"></label>
+      <span class="hint" id="qTotHint"></span>
+    </div>
+    <div class="qg"><div class="lab"><b><span class="dot" style="background:var(--good)"></span>Safe</b><span class="hint">Routine, clear owner, or mostly done</span></div>
+      <label for="qn0">How many<input type="number" id="qn0" min="0" max="500"></label><label for="qp0">Chance %<input type="number" id="qp0" min="0" max="100"></label></div>
+    <div class="qg"><div class="lab"><b><span class="dot" style="background:var(--warn)"></span>Likely</b><span class="hint">Clear plan, one outside dependency</span></div>
+      <label for="qn1">How many<input type="number" id="qn1" min="0" max="500"></label><label for="qp1">Chance %<input type="number" id="qp1" min="0" max="100"></label></div>
+    <div class="qg"><div class="lab"><b><span class="dot" style="background:var(--bad)"></span>At risk</b><span class="hint">Several dependencies or a stretch target</span></div>
+      <label for="qn2">How many<input type="number" id="qn2" min="0" max="500"></label><label for="qp2">Chance %<input type="number" id="qp2" min="0" max="100"></label></div>
+    <label class="f" for="qt">How many must land (target)<input type="number" id="qt" min="1" placeholder="80% of total"></label>
+    <span class="hint" id="qtHint"></span>
+    <label class="check" for="qr"><input type="checkbox" id="qr"> <span>One thing could hit several KRs at once<br><span class="hint">For example an access request, a licence or a key person.</span></span></label>
+    <div id="qrBox" class="stack" style="gap:10px" hidden>
+      <div class="two">
+        <label class="f" for="qrp">Chance it goes well %<input type="number" id="qrp" min="0" max="100"></label>
+        <label class="f" for="qrk">If it fails, KRs keep %<input type="number" id="qrk" min="0" max="100"></label>
+      </div>
+      <div class="f" style="font-size:13px;color:var(--muted)">It affects
+        <div class="qaff">
+          <label class="check" for="qa0"><input type="checkbox" id="qa0"> Safe</label>
+          <label class="check" for="qa1"><input type="checkbox" id="qa1"> Likely</label>
+          <label class="check" for="qa2"><input type="checkbox" id="qa2"> At risk</label>
+        </div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Answer</h2>
+    <p class="qans" id="qAns"></p>
+    <div class="tiles">
+      <div class="tile"><b class="nv" id="qMean">–</b><span>expected <span class="u2">KRs</span></span></div>
+      <div class="tile"><b id="qT">–</b><span id="qTL">chance of target</span></div>
+      <div class="tile"><b id="qAll">–</b><span id="qAllL">chance of all</span></div>
+      <div class="tile"><b class="nv" id="qRange" style="font-size:21px">–</b><span>likely range (P10–P90)</span></div>
+    </div>
+    <div class="verdict" id="qV"></div>
+    <svg class="chart" id="qHist" viewBox="0 0 720 250" role="img" aria-label="Distribution of KRs landed"></svg>
+    <h3>What would change the answer</h3>
+    <ul class="wins" id="qWins"></ul>
+    <div class="btns"><button class="b" id="qCopy">Copy answer</button><button class="b" id="qSend">Open in full calculator</button></div>
+    <span class="status" id="qMsg"></span>
+    <textarea id="qText" hidden aria-label="Answer text"></textarea>
+    <p class="note">Exact calculation, no simulation. The full calculator gives a finer answer because each KR gets its own chance and you can add several shared risks.</p>
+  </div>
+</div>
+</section>
+
+<!-- =================== ODDS =================== -->
+<section id="odds" class="tabpane">
+<div class="stack">
+<div class="banner"><span>New here? The example plan is loaded. Read <a href="#howto" data-goto="howto">How to use</a> to set up your own in about 10 minutes.</span></div>
+<div class="grid">
+  <div class="stack">
+    <div class="panel">
+      <h2>Your plan</h2>
+      <label class="f" for="pTitle">OKR or project name<input type="text" id="pTitle"></label>
+      <div class="two">
+        <label class="f" for="unit">What are you counting?
+          <select id="unit"><option value="kr">Key results (KRs)</option><option value="task">Tasks</option><option value="deliv">Deliverables</option><option value="item">Items</option></select></label>
+        <label class="f" for="pDeadline">Deadline<input type="text" id="pDeadline" placeholder="e.g. 31 March"></label>
+      </div>
+      <div class="two">
+        <label class="f" for="total"><span>How many <span class="u2">KRs</span> in total</span><input type="number" id="total" min="1" max="500"></label>
+        <label class="f" for="target">How many must land (target)<input type="number" id="target" min="1"></label>
+      </div>
+      <div class="btns"><button class="b" id="setTotal">Update total</button></div>
+      <span class="hint" id="planHint"></span>
+      <label class="check" for="scopeOk"><input type="checkbox" id="scopeOk"> <span>Scope or rewording accepted<br><span class="hint">Untick to use each KR's "if refused" chance where one is set.</span></span></label>
+      <div class="two">
+        <label class="f" for="runs">Simulated quarters
+          <select id="runs"><option>20000</option><option>50000</option><option>200000</option><option>500000</option></select></label>
+        <label class="f" for="seed">Seed<input type="number" id="seed"></label>
+      </div>
+      <span class="hint">Same seed and inputs always give the same answer. Change the seed to check the result is stable.</span>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>Shared risks</h2><button class="b" id="addRisk">Add risk</button></div>
+      <p class="note">Things that would hit several KRs at once. Set the chance each goes your way. How much each one hurts a KR is set in the KR table.</p>
+      <div id="risks" class="stack" style="gap:10px"></div>
+    </div>
+
+    <div class="panel noprint">
+      <h2>Load or start again</h2>
+      <div class="btns">
+        <button class="b" id="loadEx">Load example</button>
+        <button class="b" id="blank">Start blank</button>
+      </div>
+      <details>
+        <summary>Paste <span class="u2">KRs</span> from Excel</summary>
+        <div class="inner">
+          <p class="note">Copy rows from Excel or Sheets with columns: ID, name, chance %, and optionally chance % if scope refused. A header row is skipped.</p>
+          <textarea id="pasteKR" placeholder="A1	Customer journey map	95&#10;A2	Onboarding flow redesigned	90"></textarea>
+          <div class="btns"><button class="b" id="pasteReplace">Replace all rows</button><button class="b" id="pasteAppend">Add to rows</button></div>
+          <span class="status" id="pasteMsg"></span>
+        </div>
+      </details>
+      <details>
+        <summary>Share or back up this setup</summary>
+        <div class="inner">
+          <p class="note">Copy the setup and send it to a colleague. They paste it here and press Load setup.</p>
+          <textarea id="setupText" placeholder="Setup text appears here, or paste one in"></textarea>
+          <div class="btns"><button class="b" id="copySetup">Copy setup</button><button class="b" id="loadSetup">Load setup</button></div>
+          <span class="status" id="setupMsg"></span>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="panel">
+      <div class="ph"><h2>Result</h2><span class="hint" id="runinfo"></span></div>
+      <div class="tiles">
+        <div class="tile"><b class="nv" id="oMean">–</b><span>expected <span class="u2">KRs</span> delivered</span></div>
+        <div class="tile"><b id="oTarget">–</b><span id="oTargetL">chance of hitting target</span></div>
+        <div class="tile"><b id="oHigh">–</b><span id="oHighL">chance of a stretch result</span></div>
+        <div class="tile"><b id="oAll">–</b><span id="oAllL">chance of all KRs</span></div>
+        <div class="tile"><b class="nv" id="oRange" style="font-size:21px">–</b><span>P10 – P50 – P90</span></div>
+      </div>
+      <svg class="chart" id="hist" viewBox="0 0 720 250" role="img" aria-label="Distribution of KRs approved"></svg>
+      <p class="note" id="indep"></p>
+      <div class="btns">
+        <button class="primary" id="run">Run again</button>
+        <button class="b" id="compare">Compare scenarios</button>
+        <button class="b" id="copySum">Copy summary</button>
+      </div>
+      <span class="status" id="sumMsg"></span>
+      <textarea id="sumText" hidden aria-label="Summary text"></textarea>
+      <div id="scenWrap" hidden>
+        <h3 style="margin-bottom:8px">Which risk to fix first</h3>
+        <div class="tablewrap"><table id="scenT"><thead><tr><th>Scenario</th><th class="n">Expected</th><th class="n">Change</th><th class="n" id="scTh">P(target)</th><th class="n">P(all)</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">
+        <h2 class="u3">Key results</h2>
+        <div class="btns">
+          <label class="hint" for="sortBy" style="display:flex;gap:6px;align-items:center">Sort
+            <select id="sortBy" style="width:auto;padding:3px 6px;font-size:12.5px"><option value="plan">Plan order</option><option value="low">Lowest result first</option></select></label>
+          <button class="b" id="addKR">Add <span class="u1">KR</span></button>
+        </div>
+      </div>
+      <p class="note">All figures are percentages. "Kept if … fails" is the share of the KR's chance that survives when that risk goes badly. Blank means no effect.</p>
+      <div class="tablewrap" style="max-height:520px"><table id="krt"><thead></thead><tbody></tbody></table></div>
+      <details>
+        <summary>How the model works</summary>
+<pre class="formula">For each simulated quarter:
+  each shared risk r goes well with probability P(r)
+  for each KR k:
+    p = chance_k  (or chance-if-refused_k when scope is refused)
+    if k is tied to risk r:   p = 1 if r went well, else 0
+    for each risk r that went badly:   p = p × kept_k,r
+    KR k lands with probability p
+  X = number of KRs landed
+Expected = average X;  P(X ≥ target) = share of quarters with X ≥ target
+Independent check = exact Poisson-binomial on chance_k with no shared risks</pre>
+      </details>
+    </div>
+  </div>
+</div>
+</div>
+</section>
+
+<!-- =================== PERT =================== -->
+<section id="pert" class="tabpane" hidden>
+<div class="grid">
+  <div class="panel">
+    <h2>Window</h2>
+    <p class="note">Use this for the longest chain of work where each step needs the one before it. Estimate in working days.</p>
+    <label class="f" for="ps">Chain starts<input type="date" id="ps"></label>
+    <label class="f" for="pe">Must finish by<input type="date" id="pe"></label>
+    <label class="f" for="phol">Holidays or days off inside the window<input type="number" id="phol" min="0"></label>
+    <div class="tiles"><div class="tile"><b class="nv" id="pAvail">–</b><span>working days available</span></div></div>
+<pre class="formula">E = (O + 4M + P) / 6
+σ = (P − O) / 6
+μ = Σ E,  σ_total = √(Σ σ²)
+z = (available − μ) / σ_total
+P(on time) = Φ(z)</pre>
+  </div>
+  <div class="panel">
+    <h2>Steps (working days)</h2>
+    <p class="note">Optimistic: everything goes right. Most likely: your honest guess. Pessimistic: a bad but realistic case.</p>
+    <div class="tablewrap"><table id="pt"><thead><tr><th>Step</th><th class="n">Optimistic</th><th class="n">Most likely</th><th class="n">Pessimistic</th><th class="n">Expected</th><th class="n">σ</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="btns"><button class="b" id="padd">Add step</button><button class="b" id="preset">Load example steps</button></div>
+    <div class="tiles">
+      <div class="tile"><b class="nv" id="pMu">–</b><span>days needed (μ ± σ)</span></div>
+      <div class="tile"><b id="pP">–</b><span>chance of finishing on time</span></div>
+      <div class="tile"><b class="nv" id="pZ">–</b><span>z-score</span></div>
+      <div class="tile"><b class="nv" id="p80">–</b><span>days for 80% / 90% confidence</span></div>
+    </div>
+    <div class="verdict" id="pV"></div>
+  </div>
+</div>
+</section>
+
+<!-- =================== WEEKLY CHECK =================== -->
+<section id="warning" class="tabpane" hidden>
+<div class="grid">
+  <div class="panel">
+    <h2>This week</h2>
+    <p class="note">Assume the team is on plan, so each planned task finishes with the on-plan rate. If far fewer finish than that predicts, it is a real slip and worth escalating.</p>
+    <label class="f" for="wn">Tasks planned this week<input type="number" id="wn" min="1" max="60"></label>
+    <label class="f" for="wk">Tasks actually done<input type="number" id="wk" min="0" max="60"></label>
+    <label class="f" for="wp">On-plan finish rate (%)<input type="number" id="wp" min="1" max="99"></label>
+    <label class="f" for="wa">Significance α<input type="number" id="wa" min="0.001" max="0.5" step="0.01"></label>
+<pre class="formula">p-value = P(X ≤ done | planned, rate)
+Escalate if p-value ≤ α</pre>
+  </div>
+  <div class="panel">
+    <h2>Verdict</h2>
+    <div class="tiles">
+      <div class="tile"><b class="nv" id="wPv">–</b><span>p-value</span></div>
+      <div class="tile"><b class="nv" id="wThr">–</b><span>escalate if fewer than this are done</span></div>
+    </div>
+    <div class="verdict" id="wV"></div>
+    <h3>Threshold table (for your rate and α)</h3>
+    <div class="tablewrap"><table id="wt"><thead><tr><th class="n">Planned</th><th class="n">Escalate if done is below</th><th class="n">Expected done</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</div>
+</section>
+
+<!-- =================== PROOF TEST =================== -->
+<section id="proof" class="tabpane" hidden>
+<div class="grid">
+  <div class="panel">
+    <h2>Your sample</h2>
+    <p class="note">For KRs stated as a rate, such as "40% of records meet the quality standard". Check a random sample. To claim the target you need enough conforming items that the result could not easily happen if the true rate were at or below the target.</p>
+    <label class="f" for="en">Items sampled<input type="number" id="en" min="1" max="5000"></label>
+    <label class="f" for="ek">Items that meet the standard<input type="number" id="ek" min="0" max="5000"></label>
+    <label class="f" for="ep">Target rate (%)<input type="number" id="ep" min="1" max="99"></label>
+    <label class="f" for="ea">Significance α<input type="number" id="ea" min="0.001" max="0.5" step="0.01"></label>
+<pre class="formula">p-value = P(X ≥ conforming | sample, target)
+Wilson 95% interval for the true rate
+Needed = smallest count with p-value ≤ α</pre>
+  </div>
+  <div class="panel">
+    <h2>Verdict</h2>
+    <div class="tiles">
+      <div class="tile"><b class="nv" id="eRate">–</b><span>observed rate</span></div>
+      <div class="tile"><b class="nv" id="ePv">–</b><span>p-value</span></div>
+      <div class="tile"><b class="nv" id="eMin">–</b><span>conforming needed to prove target</span></div>
+      <div class="tile"><b class="nv" id="eCI">–</b><span>95% interval (Wilson)</span></div>
+    </div>
+    <div class="verdict" id="eV"></div>
+    <h3>Conforming items needed by sample size</h3>
+    <div class="tablewrap"><table id="et"><thead><tr><th class="n">Sample</th><th class="n">Needed</th><th class="n">As a rate</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</div>
+</section>
+<footer class="credit"><span>OKR Odds Calculator</span><span>Built by <b>Surya Gupta</b></span></footer>
+</div>
+
+<script>
+/* =================== example data =================== */
+const EX_KR = [
+ ["A1","Customer journey map signed off",95],["A2","Onboarding flow redesigned",90],["A3","NPS baseline and target agreed",92],
+ ["A4","Help centre articles published",92],["A5","Accessibility audit passed",92],["B1","Architecture review complete",95],
+ ["B2","Release notes within 48h",97],["B3","Partner API integration live",80],["B4","Real-time metrics in dashboard",88],
+ ["B5","Single customer view agreed",85],["C1","Event tracking implemented",90],["C2","Data dictionary + 50 terms",92],
+ ["C3","Data pipeline validated",92],["C4","Self-service analytics pilot",85],["C5","Platform on-call cover",96],
+ ["D1","Support runbooks published",93],["D2","Owner named for every service",92],["D3","Quarterly access review done",92],
+ ["D4","Integration monitoring live",94],["D5","Partner data feeds automated",90],["E1","Adoption KPIs agreed",96],
+ ["E2","Launch comms plan approved",93],["E3","40% of users active weekly",80],["E4","Usage dashboards live",95],
+ ["E5","Browser extension rolled out",85],["F1","Quarterly check-ins held",98],["F2","Development plans agreed",97],
+ ["F3","Knowledge-sharing sessions",95],["F4","Retro every sprint",98],["F5","Hiring plan approved",97],
+ ["G1","Report certification live",88],["G2","Manual scripts automated",90],["G3","Shared dashboard framework",95]];
+const EX_ALT={B4:75,B5:60,C3:85,C4:55,E3:50};
+const EX_M={r1:{C3:55,B4:45,D4:65,D5:60,B5:80},r2:{C2:80,D2:80,D3:75,E3:70,G1:85,C4:85},r3:{A4:88,A5:88,C4:85,E4:92,E5:85,G1:90,G2:80,G3:92}};
+const EX_PERT=[["Partner API access approved",5,10,18],["Dev environment connected",3,5,8],["Data pipeline build and validation (C3)",5,7,12],["Real-time metrics checked (B4)",2,3,5]];
+function example(){
+  return {v:2,title:"Customer Platform Launch (example)",deadline:"the end of the quarter",target:27,scopeOk:true,runs:200000,seed:7,
+    risks:[{id:"r1",name:"Partner API access by week 4",p:75,tied:"B3"},{id:"r2",name:"Business owners respond on time",p:80,tied:""},{id:"r3",name:"Lead engineer not overloaded",p:70,tied:""}],
+    krs:EX_KR.map(([id,name,p])=>({id,name,p,alt:EX_ALT[id]??null,m:Object.fromEntries(Object.keys(EX_M).filter(r=>EX_M[r][id]!=null).map(r=>[r,EX_M[r][id]]))})),
+    pert:{start:"2026-10-22",end:"2026-11-27",hol:0,steps:EX_PERT.map(r=>[...r])},
+    week:{n:8,k:5,p:90,a:0.05},proof:{n:100,k:47,p:40,a:0.05},simple:defSimple()};
+}
+function blankSetup(){
+  const s=example();
+  Object.assign(s,{title:"My OKR",deadline:"end of quarter",target:4,
+    risks:[{id:"r1",name:"Key dependency delivered on time",p:80,tied:""}],
+    krs:[{id:"KR1",name:"First key result",p:90,alt:null,m:{}},{id:"KR2",name:"Second key result",p:85,alt:null,m:{r1:60}},
+         {id:"KR3",name:"Third key result",p:80,alt:null,m:{r1:50}},{id:"KR4",name:"Fourth key result",p:95,alt:null,m:{}},{id:"KR5",name:"Fifth key result",p:75,alt:null,m:{}}]});
+  return s;
+}
+
+/* =================== state + storage =================== */
+const KEY="okr-odds-calculator-public-v1";
+const UNITS={kr:["KR","KRs","Key results","Key result","KR"],task:["task","tasks","Tasks","Task","T"],deliv:["deliverable","deliverables","Deliverables","Deliverable","D"],item:["item","items","Items","Item","I"]};
+function U(){return UNITS[(S&&S.unit)||"kr"]||UNITS.kr;}
+let S;
+try{const raw=localStorage.getItem(KEY);S=raw?JSON.parse(raw):null;}catch(e){S=null;}
+if(!valid(S))S=example();
+if(!S.simple)S.simple=defSimple();
+function valid(s){return s&&s.v===2&&Array.isArray(s.krs)&&Array.isArray(s.risks)&&s.pert&&s.week&&s.proof;}
+let saveT=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}},250);}
+const $=id=>document.getElementById(id);
+const esc=t=>String(t??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtP=x=>x>=0.995&&x<1?">99%":x<0.005&&x>0?"<1%":Math.round(x*100)+"%";
+const band=p=>p>=0.9?"good":p>=0.8?"warn":"bad";
+const clampPct=v=>{v=parseFloat(v);return isNaN(v)?null:Math.min(100,Math.max(0,v));};
+function flash(id,msg){const el=$(id);el.textContent=msg;clearTimeout(el._t);el._t=setTimeout(()=>el.textContent="",4000);}
+function copyText(text,fallbackEl,msgId,okMsg){
+  const done=()=>flash(msgId,okMsg);
+  const fb=()=>{if(fallbackEl){fallbackEl.hidden=false;fallbackEl.value=text;fallbackEl.focus();fallbackEl.select();}flash(msgId,"Copy blocked here. The text is selected: press Ctrl+C (Cmd+C on Mac).");};
+  try{navigator.clipboard.writeText(text).then(done,fb);}catch(e){fb();}
+}
+
+/* =================== theme switch =================== */
+(function(){
+  const root=document.documentElement,sw=$("themeSw");
+  const sys=()=>window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+  const cur=()=>root.getAttribute("data-theme")||sys();
+  const paint=()=>sw.setAttribute("aria-checked",cur()==="dark");
+  try{const t=localStorage.getItem("okr-odds-theme");if(t==="dark"||t==="light")root.setAttribute("data-theme",t);}catch(e){}
+  paint();
+  sw.addEventListener("click",()=>{const next=cur()==="dark"?"light":"dark";root.setAttribute("data-theme",next);try{localStorage.setItem("okr-odds-theme",next);}catch(e){}paint();});
+  if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)").addEventListener("change",paint);
+})();
+
+/* =================== save as PDF (print) =================== */
+(function(){
+  let framed=true;try{framed=window.self!==window.top;}catch(e){}
+  const btn=$("pdfBtn");if(framed)return;btn.hidden=false;
+  let oldTitle=document.title;
+  const tabName=()=>{const t=document.querySelector('nav button[aria-selected="true"]');return t?t.textContent:"";};
+  const prep=()=>{const d=new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+    $("printHead").textContent=`${S.title} · ${tabName()} · generated ${d} · OKR Odds Calculator, built by Surya Gupta`;
+    oldTitle=document.title;document.title=`${S.title} - ${tabName()} - ${d}`;};
+  window.addEventListener("beforeprint",prep);
+  window.addEventListener("afterprint",()=>{document.title=oldTitle;});
+  btn.addEventListener("click",()=>{prep();window.print();});
+})();
+
+/* =================== tabs =================== */
+const TABS=["howto","quick","odds","pert","warning","proof"];
+function show(t){TABS.forEach(x=>{$(x).hidden=x!==t;$("t-"+x).setAttribute("aria-selected",x===t)});}
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{show(b.dataset.tab);try{history.replaceState(null,"","#"+b.dataset.tab)}catch(e){}}));
+document.querySelectorAll("[data-goto]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();show(a.dataset.goto);window.scrollTo(0,0);}));
+document.querySelectorAll(".toc a").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const el=document.querySelector(a.getAttribute("href"));if(el)el.scrollIntoView({behavior:"smooth",block:"start"});}));
+document.querySelectorAll('.doc a[href^="#g-"]').forEach(a=>a.addEventListener("click",e=>{e.preventDefault();document.querySelector(a.getAttribute("href")).scrollIntoView({behavior:"smooth"});}));
+if(TABS.includes(location.hash.slice(1)))show(location.hash.slice(1));
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(TABS.includes(h))show(h);});
+
+/* =================== header + plan inputs =================== */
+function header(){
+  const n=S.krs.length,u=U();
+  $("hEyebrow").textContent="OKR Odds Calculator";
+  document.querySelectorAll(".u1").forEach(e=>e.textContent=u[0]);
+  document.querySelectorAll(".u2").forEach(e=>e.textContent=u[1]);
+  document.querySelectorAll(".u3").forEach(e=>e.textContent=u[2]);
+  planHint();
+}
+function planHint(){
+  const n=S.krs.length,u=U(),h=$("planHint"),want=parseInt($("total").value);
+  if(document.activeElement!==$("total"))$("total").value=n;
+  if(want>0&&want!==n&&document.activeElement===$("total")){h.className="hint warn";h.textContent=want>n?`Press Update total to add ${want-n} new row${want-n===1?"":"s"}.`:`Press Update total to remove the last ${n-want} row${n-want===1?"":"s"}.`;return;}
+  if(S.target>n){h.className="hint bad";h.textContent=`The target (${S.target}) is more than the ${n} ${u[1]} in the table. Raise the total or lower the target.`;return;}
+  h.className="hint";h.textContent=`Target ${S.target} of ${n} ${u[1]} (${Math.round(S.target/n*100)}%).`;
+}
+function bindPlan(){
+  $("unit").value=S.unit||"kr";$("total").value=S.krs.length;
+  $("pTitle").value=S.title;$("pDeadline").value=S.deadline;$("target").value=S.target;$("scopeOk").checked=S.scopeOk;
+  $("runs").value=String(S.runs);$("seed").value=S.seed;
+}
+$("pTitle").addEventListener("input",e=>{S.title=e.target.value;header();save();});
+$("pDeadline").addEventListener("input",e=>{S.deadline=e.target.value;header();save();});
+$("target").addEventListener("input",e=>{const v=parseInt(e.target.value);if(v>0){S.target=v;save();render();}});
+$("unit").addEventListener("change",e=>{S.unit=e.target.value;save();drawKRHead();render();calcQuick();});
+$("total").addEventListener("input",planHint);
+$("total").addEventListener("blur",()=>setTimeout(planHint,200));
+$("total").addEventListener("keydown",e=>{if(e.key==="Enter")$("setTotal").click();});
+let totArm=null;
+$("setTotal").addEventListener("click",()=>{
+  const b=$("setTotal"),u=U(),n=S.krs.length,want=Math.min(500,Math.max(1,parseInt($("total").value)||n));
+  if(want===n){clearTimeout(totArm);totArm=null;b.textContent="Update total";$("total").value=n;planHint();return;}
+  if(want<n&&!totArm){b.textContent=`Remove the last ${n-want}? Click again`;totArm=setTimeout(()=>{totArm=null;b.textContent="Update total";},5000);return;}
+  clearTimeout(totArm);totArm=null;b.textContent="Update total";
+  if(want>n){for(let i=n+1;i<=want;i++){let id=u[4]+i;while(S.krs.some(k=>k.id===id))id+="+";S.krs.push({id,name:`New ${u[0]} ${i}`,p:90,alt:null,m:{}});}}
+  else{const gone=S.krs.splice(want).map(k=>k.id);S.risks.forEach(r=>{if(gone.includes(r.tied))r.tied="";});}
+  if(S.target>want)S.target=Math.max(1,Math.ceil(want*0.8-1e-9));
+  save();drawAll();$("total").blur();
+  flash("setupMsg",want>n?`Added ${want-n} rows. Name them and set each chance in the table.`:`Removed ${n-want} rows.`);});
+$("scopeOk").addEventListener("change",e=>{S.scopeOk=e.target.checked;save();schedule();});
+$("runs").addEventListener("change",e=>{S.runs=+e.target.value;save();schedule();});
+$("seed").addEventListener("input",e=>{S.seed=parseInt(e.target.value)||1;save();schedule();});
+
+/* =================== risks =================== */
+function newRiskId(){let i=1;while(S.risks.some(r=>r.id==="r"+i))i++;return "r"+i;}
+function drawRisks(){
+  const box=$("risks");box.innerHTML="";
+  if(!S.risks.length)box.innerHTML='<p class="note">No shared risks. Every KR is treated as independent. Add one if several KRs depend on the same thing.</p>';
+  S.risks.forEach((r,i)=>{
+    const d=document.createElement("div");d.className="risk";
+    d.innerHTML=`<input type="text" id="rn-${r.id}" value="${esc(r.name)}" aria-label="Risk name">
+      <button class="x" data-del="${i}" aria-label="Remove risk ${esc(r.name)}">Remove</button>
+      <div class="rr"><span class="hint">Goes well</span><input type="range" id="rp-${r.id}" min="0" max="100" step="1" value="${r.p}" aria-label="Chance it goes well"><span class="val" id="rv-${r.id}">${r.p}%</span></div>
+      <label class="rr hint" for="rt-${r.id}">Is also KR <select id="rt-${r.id}" style="width:auto;flex:1"><option value="">none</option>${S.krs.map(k=>`<option ${k.id===r.tied?"selected":""}>${esc(k.id)}</option>`).join("")}</select></label>`;
+    box.appendChild(d);
+    $("rn-"+r.id).addEventListener("input",e=>{r.name=e.target.value;save();drawKRHead();});
+    $("rp-"+r.id).addEventListener("input",e=>{r.p=+e.target.value;$("rv-"+r.id).textContent=r.p+"%";save();schedule();});
+    $("rt-"+r.id).addEventListener("change",e=>{r.tied=e.target.value;save();schedule();});
+  });
+  box.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{const r=S.risks.splice(+b.dataset.del,1)[0];S.krs.forEach(k=>delete k.m[r.id]);save();drawAll();}));
+}
+$("addRisk").addEventListener("click",()=>{if(S.risks.length>=8){return;}S.risks.push({id:newRiskId(),name:"New shared risk",p:80,tied:""});save();drawAll();});
+
+/* =================== KR table =================== */
+let order=null;
+function drawKRHead(){
+  const short=s=>s.length>22?s.slice(0,21)+"…":s;
+  $("krt").tHead.innerHTML=`<tr><th>ID</th><th>${U()[3]}</th><th class="n">Chance<br>%</th><th class="n">If refused<br>%</th>${S.risks.map(r=>`<th class="n" title="${esc(r.name)}">Kept if fails<br>${esc(short(r.name))}</th>`).join("")}<th class="n">Result</th><th></th></tr>`;
+}
+function drawKR(){
+  drawKRHead();
+  const tb=$("krt").tBodies[0];tb.innerHTML="";
+  let idx=S.krs.map((_,i)=>i);
+  if($("sortBy").value==="low"&&last&&last.per.length===S.krs.length)idx.sort((a,b)=>last.per[a]-last.per[b]);
+  idx.forEach(i=>{const k=S.krs[i];const tied=S.risks.some(r=>r.tied===k.id);
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><input type="text" class="id" data-f="id" value="${esc(k.id)}" aria-label="KR ID"></td>
+      <td><input type="text" class="nm" data-f="name" value="${esc(k.name)}" aria-label="KR name"></td>
+      <td class="n"><input type="number" data-f="p" min="0" max="100" value="${k.p}" aria-label="Chance ${esc(k.id)}" ${tied?'title="Follows its shared risk"':""}></td>
+      <td class="n"><input type="number" data-f="alt" min="0" max="100" value="${k.alt??""}" aria-label="Chance if refused ${esc(k.id)}"></td>
+      ${S.risks.map(r=>`<td class="n"><input type="number" data-r="${r.id}" min="0" max="100" value="${k.m[r.id]??""}" aria-label="Kept if ${esc(r.name)} fails, ${esc(k.id)}"></td>`).join("")}
+      <td class="n" data-res>${tied?'<span class="hint">follows risk</span>':"–"}</td>
+      <td><button class="x" data-del aria-label="Remove ${esc(k.id)}">×</button></td>`;
+    tr.querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{
+      const f=inp.dataset.f,r=inp.dataset.r;
+      if(f==="id"){const old=k.id;k.id=inp.value.trim();S.risks.forEach(x=>{if(x.tied===old)x.tied=k.id;});}
+      else if(f==="name")k.name=inp.value;
+      else if(f==="p"){const v=clampPct(inp.value);if(v!==null)k.p=v;}
+      else if(f==="alt")k.alt=clampPct(inp.value);
+      else if(r){const v=clampPct(inp.value);if(v===null)delete k.m[r];else k.m[r]=v;}
+      save();if(f==="id"){header();}else if(f!=="name")schedule();}));
+    tr.querySelector('[data-f="id"]').addEventListener("change",drawRisks);
+    tr.querySelector("[data-del]").addEventListener("click",()=>{S.risks.forEach(x=>{if(x.tied===k.id)x.tied="";});S.krs.splice(i,1);save();drawAll();});
+    tr.dataset.i=i;tb.appendChild(tr);});
+  paintResults();
+}
+$("addKR").addEventListener("click",()=>{const u=U();let n=S.krs.length+1;while(S.krs.some(k=>k.id===u[4]+n))n++;S.krs.push({id:u[4]+n,name:`New ${u[0]}`,p:90,alt:null,m:{}});save();drawAll();
+  const rows=$("krt").tBodies[0].rows;const lastRow=[...rows].find(r=>+r.dataset.i===S.krs.length-1);if(lastRow){lastRow.scrollIntoView({block:"nearest"});lastRow.querySelector(".nm").select();}});
+$("sortBy").addEventListener("change",drawKR);
+
+/* =================== simulation =================== */
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function model(opts={}){
+  const N=opts.runs||S.runs, r=rng(S.seed), scopeOk=opts.scopeOk??S.scopeOk;
+  const risks=S.risks.map(x=>({id:x.id,p:(opts.force&&opts.force.includes(x.id))?1:x.p/100,tied:x.tied}));
+  const ks=S.krs.map(k=>{const t=risks.findIndex(x=>x.tied&&x.tied===k.id);
+    return {p:((!scopeOk&&k.alt!=null)?k.alt:k.p)/100,tied:t,m:risks.map(x=>k.m[x.id]!=null?k.m[x.id]/100:1)};});
+  const n=ks.length,R=risks.length,counts=new Float64Array(n+1),per=new Float64Array(n),ok=new Array(R);
+  for(let i=0;i<N;i++){
+    for(let j=0;j<R;j++)ok[j]=r()<risks[j].p;
+    let c=0;
+    for(let j=0;j<n;j++){const k=ks[j];let p=k.p;
+      if(k.tied>=0)p=ok[k.tied]?1:0;
+      for(let q=0;q<R;q++)if(!ok[q])p*=k.m[q];
+      if(r()<p){c++;per[j]++;}}
+    counts[c]++;}
+  const dist=Array.from(counts,x=>x/N);
+  const mean=dist.reduce((a,d,i)=>a+i*d,0);
+  const ge=m=>dist.slice(Math.max(0,m)).reduce((a,b)=>a+b,0);
+  const q=x=>{let c=0;for(let i=0;i<=n;i++){c+=dist[i];if(c>=x-1e-12)return i;}return n;};
+  return {dist,mean,ge,q,n,N,per:Array.from(per,x=>x/N)};
+}
+let last=null,simT=null;
+function schedule(){clearTimeout(simT);simT=setTimeout(simulate,300);}
+function simulate(){
+  if(!S.krs.length){last=null;render();return;}
+  const t0=performance.now();last=model();
+  $("runinfo").textContent=`${last.N.toLocaleString()} quarters in ${Math.round(performance.now()-t0)} ms · seed ${S.seed}`;
+  $("scenWrap").hidden=true;render();
+}
+function render(){
+  header();
+  if(!last){["oMean","oTarget","oHigh","oAll","oRange"].forEach(id=>$(id).textContent="–");$("hist").innerHTML="";$("indep").textContent=`Add at least one ${U()[0]} to see a result.`;return;}
+  const {dist,mean,ge,q,n}=last, t=Math.min(n,Math.max(1,S.target)), hi=Math.min(n,t+3);
+  $("oMean").textContent=`${mean.toFixed(1)} / ${n}`;
+  const set=(id,v)=>{$(id).textContent=fmtP(v);$(id).className=band(v);};
+  set("oTarget",ge(t));$("oTargetL").textContent=`chance of at least ${t} (${Math.round(t/n*100)}%)`;
+  set("oHigh",ge(hi));$("oHighL").textContent=`chance of at least ${hi}`;$("oHigh").parentElement.hidden=hi<=t;
+  set("oAll",dist[n]);$("oAllL").textContent=`chance of all ${n}`;
+  $("oRange").textContent=`${q(.1)} – ${q(.5)} – ${q(.9)}`;
+  let dp=[1];S.krs.forEach(k=>{const p=k.p/100,nd=new Array(dp.length+1).fill(0);dp.forEach((v,i)=>{nd[i]+=v*(1-p);nd[i+1]+=v*p});dp=nd;});
+  const im=S.krs.reduce((a,k)=>a+k.p/100,0),it=dp.slice(t).reduce((a,b)=>a+b,0);
+  $("indep").textContent=S.risks.length
+    ?`Independent check (same chances, no shared risks): expected ${im.toFixed(1)}, P(≥${t}) ${fmtP(it)}, P(all ${n}) ${fmtP(dp[n])}. The gap to the result above is what shared risks cost you.`
+    :`No shared risks are set, so every ${U()[0]} is treated as independent.`;
+  drawHist(dist,t,mean,n);paintResults();
+}
+function paintResults(){
+  if(!last||last.per.length!==S.krs.length)return;
+  [...$("krt").tBodies[0].rows].forEach(tr=>{const i=+tr.dataset.i,v=last.per[i],c=tr.querySelector("[data-res]");if(!c)return;
+    c.innerHTML=`<span class="pbar" style="width:${Math.round(v*36)}px;background:var(--${band(v)})"></span>${(v*100).toFixed(1)}%`;c.className="n "+band(v);});
+}
+function drawHist(dist,t,mean,n,svgEl){
+  const svg=svgEl||$("hist"),W=720,H=250,L=44,R=12,T=14,B=36,lo=Math.max(0,n-15),hi=n,bw=(W-L-R)/(hi-lo+1);
+  const mx=Math.max(...dist.slice(lo))||0.05,top=Math.max(0.05,Math.ceil(mx*20)/20),step=top>0.3?0.1:0.05;
+  const y=v=>T+(H-T-B)*(1-v/top);let s="";
+  for(let g=0;g<=top+1e-9;g+=step)s+=`<line x1="${L}" x2="${W-R}" y1="${y(g)}" y2="${y(g)}" stroke="var(--line)"/><text x="${L-6}" y="${y(g)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--mono)">${Math.round(g*100)}%</text>`;
+  for(let i=lo;i<=hi;i++){const x=L+(i-lo)*bw,v=dist[i]||0;
+    s+=`<rect x="${x+2}" y="${y(v)}" width="${Math.max(1,bw-4)}" height="${Math.max(0,H-B-y(v))}" rx="2" fill="${i>=t?"var(--accent)":"var(--line)"}"><title>${i} ${U()[1]}: ${(v*100).toFixed(1)}%</title></rect>`;
+    s+=`<text x="${x+bw/2}" y="${H-B+16}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--mono)">${i}</text>`;}
+  if(t>=lo){const xt=L+(t-lo)*bw;s+=`<line x1="${xt}" x2="${xt}" y1="${T}" y2="${H-B}" stroke="var(--navy)" stroke-dasharray="4 3"/><text x="${xt+4}" y="${T+10}" font-size="11" fill="var(--navy)" font-weight="600">target ${t}</text>`;}
+  if(mean>=lo){const xm=L+(mean-lo+0.5)*bw;s+=`<line x1="${xm}" x2="${xm}" y1="${T+16}" y2="${H-B}" stroke="var(--warn)" stroke-width="2"/><text x="${xm-4}" y="${T+26}" text-anchor="end" font-size="11" fill="var(--warn)" font-weight="600">mean ${mean.toFixed(1)}</text>`;}
+  s+=`<text x="${(W+L)/2}" y="${H-4}" text-anchor="middle" font-size="11" fill="var(--muted)">${U()[1]} delivered by ${esc(S.deadline||"the deadline")}${lo>0?` (below ${lo} not shown)`:""}</text>`;
+  svg.innerHTML=s;
+}
+$("run").addEventListener("click",()=>{simulate();if($("sortBy").value==="low")drawKR();});
+
+/* scenarios */
+$("compare").addEventListener("click",()=>{
+  if(!S.krs.length)return;
+  const N=Math.min(S.runs,100000),t=Math.min(S.krs.length,S.target);
+  const rows=[["Plan as set",{}]];
+  S.risks.forEach(r=>rows.push([`${r.name} goes well`,{force:[r.id]}]));
+  if(S.risks.length>1)rows.push(["All shared risks go well",{force:S.risks.map(r=>r.id)}]);
+  if(S.krs.some(k=>k.alt!=null))rows.push([S.scopeOk?"Scope change refused":"Scope change accepted",{scopeOk:!S.scopeOk}]);
+  const base=model({runs:N});
+  $("scTh").textContent=`P(≥${t})`;
+  $("scenT").tBodies[0].innerHTML=rows.map(([name,o],i)=>{const m=i?model({...o,runs:N}):base,d=m.mean-base.mean;
+    return `<tr${i===0?' class="sel"':""}><td>${esc(name)}</td><td class="n">${m.mean.toFixed(1)}</td><td class="n ${d>0.05?"good":d<-0.05?"bad":""}">${i?(d>=0?"+":"")+d.toFixed(1):"–"}</td><td class="n">${fmtP(m.ge(t))}</td><td class="n">${fmtP(m.dist[m.n])}</td></tr>`;}).join("");
+  $("scenWrap").hidden=false;
+});
+$("copySum").addEventListener("click",()=>{
+  if(!last)return;const n=last.n,t=Math.min(n,S.target);
+  const low=S.krs.map((k,i)=>[k.id,last.per[i]]).sort((a,b)=>a[1]-b[1]).slice(0,5).map(([id,v])=>`${id} ${Math.round(v*100)}%`).join(", ");
+  const txt=`${S.title}: forecast to ${S.deadline}\n`+
+    `Expected: ${last.mean.toFixed(1)} of ${n} ${U()[1]}\nChance of at least ${t}: ${fmtP(last.ge(t))}\nChance of all ${n}: ${fmtP(last.dist[n])}\n`+
+    `Likely range (P10–P90): ${last.q(.1)}–${last.q(.9)}\nLowest: ${low}\n`+
+    (S.risks.length?`Shared risks: ${S.risks.map(r=>`${r.name} ${r.p}%`).join("; ")}\n`:"")+
+    `(${last.N.toLocaleString()} simulated quarters, seed ${S.seed} · OKR Odds Calculator, built by Surya Gupta)`;
+  copyText(txt,$("sumText"),"sumMsg","Summary copied. Paste it into your email or Teams.");
+});
+
+/* load / paste / share */
+function drawAll(){bindPlan();header();drawRisks();drawKR();drawPert();bindSmall();calcWarn();calcProof();bindQuick();calcQuick();schedule();}
+$("loadEx").addEventListener("click",()=>{S=example();save();drawAll();flash("setupMsg","Example loaded.");});
+$("blank").addEventListener("click",()=>{S=blankSetup();save();drawAll();flash("setupMsg","Blank setup with 5 sample rows. Edit them or paste your own.");});
+function parsePaste(text){
+  const out=[];text.split(/\r?\n/).forEach(line=>{if(!line.trim())return;
+    const c=(line.includes("\t")?line.split("\t"):line.split(/;|,/)).map(x=>x.trim());
+    if(c.length<3)return;const p=clampPct(String(c[2]).replace("%",""));if(p===null)return;
+    let pp=p;if(p<=1&&String(c[2]).indexOf("%")<0&&String(c[2]).includes("."))pp=p*100;
+    let alt=c[3]!=null&&c[3]!==""?clampPct(String(c[3]).replace("%","")):null;if(alt!==null&&alt<=1&&String(c[3]).includes("."))alt*=100;
+    out.push({id:c[0],name:c[1],p:Math.round(pp*10)/10,alt,m:{}});});
+  return out;
+}
+function doPaste(replace){
+  const rows=parsePaste($("pasteKR").value);
+  if(!rows.length){flash("pasteMsg","No rows found. Each line needs ID, name and chance %, separated by tabs.");return;}
+  if(replace){S.krs=rows;S.risks.forEach(r=>{if(!rows.some(k=>k.id===r.tied))r.tied="";});S.target=Math.max(1,Math.round(rows.length*0.8));}
+  else S.krs.push(...rows);
+  save();drawAll();flash("pasteMsg",`${rows.length} row${rows.length===1?"":"s"} ${replace?"loaded":"added"}. Now set "kept if fails" for your shared risks.`);
+}
+$("pasteReplace").addEventListener("click",()=>doPaste(true));
+$("pasteAppend").addEventListener("click",()=>doPaste(false));
+$("copySetup").addEventListener("click",()=>{const txt=JSON.stringify(S);$("setupText").value=txt;copyText(txt,$("setupText"),"setupMsg","Setup copied. Send it to a colleague; they paste it here and press Load setup.");});
+$("loadSetup").addEventListener("click",()=>{
+  try{const s=JSON.parse($("setupText").value);if(!valid(s))throw 0;S=s;if(!S.simple)S.simple=defSimple();save();drawAll();flash("setupMsg",`Loaded "${S.title}".`);}
+  catch(e){flash("setupMsg","That text is not a setup from this calculator. Copy it again with Copy setup.");}
+});
+
+/* =================== PERT =================== */
+const erf=x=>{const s=Math.sign(x);x=Math.abs(x);const t=1/(1+0.3275911*x);return s*(1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x));};
+const Phi=z=>0.5*(1+erf(z/Math.SQRT2));
+const invPhi=p=>{let lo=-8,hi=8;for(let i=0;i<80;i++){const m=(lo+hi)/2;Phi(m)<p?lo=m:hi=m;}return(lo+hi)/2;};
+function workdays(a,b){if(!a||!b)return 0;let d=new Date(a+"T12:00:00"),e=new Date(b+"T12:00:00"),n=0;while(d<=e){const w=d.getDay();if(w&&w<6)n++;d.setDate(d.getDate()+1);}return n;}
+function drawPert(){
+  const P=S.pert;$("ps").value=P.start;$("pe").value=P.end;$("phol").value=P.hol;
+  const body=$("pt").tBodies[0];body.innerHTML="";
+  P.steps.forEach((s,i)=>{const tr=document.createElement("tr");
+    tr.innerHTML=`<td><input type="text" data-j="0" value="${esc(s[0])}" style="width:17em" aria-label="Step name"></td>`+
+      [1,2,3].map(j=>`<td class="n"><input type="number" data-j="${j}" min="0" step="0.5" value="${s[j]}" aria-label="${["","Optimistic","Most likely","Pessimistic"][j]} days"></td>`).join("")+
+      `<td class="n" data-e></td><td class="n" data-s></td><td><button class="x" aria-label="Remove step">×</button></td>`;
+    tr.querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{const j=+inp.dataset.j;s[j]=j?(parseFloat(inp.value)||0):inp.value;save();calcPert();}));
+    tr.querySelector("button").addEventListener("click",()=>{P.steps.splice(i,1);save();drawPert();});
+    body.appendChild(tr);});
+  calcPert();
+}
+function calcPert(){
+  const P=S.pert;let mu=0,v=0;const rows=$("pt").tBodies[0].rows;
+  P.steps.forEach((s,i)=>{const e=(s[1]+4*s[2]+s[3])/6,sd=Math.abs(s[3]-s[1])/6;mu+=e;v+=sd*sd;rows[i].querySelector("[data-e]").textContent=e.toFixed(1);rows[i].querySelector("[data-s]").textContent=sd.toFixed(2);});
+  const sd=Math.sqrt(v),avail=Math.max(0,workdays(P.start,P.end)-(parseInt(P.hol)||0));
+  $("pAvail").textContent=avail;
+  if(!P.steps.length){["pMu","pP","pZ","p80"].forEach(id=>$(id).textContent="–");$("pV").textContent="Add the steps of your critical chain.";return;}
+  const z=sd>0?(avail-mu)/sd:(avail>=mu?Infinity:-Infinity),p=Phi(z);
+  $("pMu").textContent=`${mu.toFixed(1)} ± ${sd.toFixed(1)}`;$("pP").textContent=fmtP(p);$("pP").className=band(p);
+  $("pZ").textContent=isFinite(z)?z.toFixed(2):"–";
+  const d80=Math.ceil(mu+invPhi(.8)*sd),d90=Math.ceil(mu+invPhi(.9)*sd);
+  $("p80").textContent=`${d80} / ${d90}`;
+  $("pV").className="verdict "+(p>=0.8?"goodv":p<0.6?"badv":"");
+  $("pV").textContent=`Float is ${(avail-mu).toFixed(1)} working days. `+(p>=0.8?"The chain is comfortable.":`For 80% confidence you need ${Math.max(0,d80-avail)} more working day${d80-avail===1?"":"s"}, or shorten the step with the widest range.`);
+}
+$("ps").addEventListener("input",e=>{S.pert.start=e.target.value;save();calcPert();});
+$("pe").addEventListener("input",e=>{S.pert.end=e.target.value;save();calcPert();});
+$("phol").addEventListener("input",e=>{S.pert.hol=parseInt(e.target.value)||0;save();calcPert();});
+$("padd").addEventListener("click",()=>{S.pert.steps.push(["New step",1,2,4]);save();drawPert();});
+$("preset").addEventListener("click",()=>{S.pert=example().pert;save();drawPert();});
+
+/* =================== binomial =================== */
+function lchoose(n,k){let s=0;for(let i=1;i<=k;i++)s+=Math.log(n-k+i)-Math.log(i);return s;}
+const pmf=(i,n,p)=>p<=0?(i===0?1:0):p>=1?(i===n?1:0):Math.exp(lchoose(n,i)+i*Math.log(p)+(n-i)*Math.log(1-p));
+const cdf=(k,n,p)=>{let s=0;for(let i=0;i<=k;i++)s+=pmf(i,n,p);return Math.min(1,s);};
+function bindSmall(){const W=S.week,E=S.proof;$("wn").value=W.n;$("wk").value=W.k;$("wp").value=W.p;$("wa").value=W.a;$("en").value=E.n;$("ek").value=E.k;$("ep").value=E.p;$("ea").value=E.a;}
+function escThr(n,p,a){let c=0;for(let k=0;k<=n;k++)if(cdf(k-1,n,p)<=a)c=k;return c;}
+function calcWarn(){
+  const W=S.week,n=Math.max(1,W.n|0),k=Math.min(n,Math.max(0,W.k|0)),p=Math.min(.99,Math.max(.01,W.p/100)),a=W.a;
+  const pv=cdf(k,n,p),thr=escThr(n,p,a);
+  $("wPv").textContent=pv<0.001?"<0.001":pv.toFixed(3);$("wThr").textContent=thr||"none";
+  const bad=pv<=a;$("wV").className="verdict "+(bad?"badv":"goodv");
+  $("wV").textContent=bad?`${k} of ${n} done. That is unlikely if the team were on plan (p = ${pv.toFixed(3)}, at or below ${a}). Treat it as a real slip and escalate this week.`
+                         :`${k} of ${n} done. This can happen in a normal week (p = ${pv.toFixed(3)}, above ${a}). Watch it, no escalation needed yet.`;
+  $("wt").tBodies[0].innerHTML=Array.from({length:18},(_,i)=>i+3).map(m=>`<tr${m===n?' class="sel"':""}><td class="n">${m}</td><td class="n">${escThr(m,p,a)||"–"}</td><td class="n">${(m*p).toFixed(1)}</td></tr>`).join("");
+}
+[["wn","n"],["wk","k"],["wp","p"],["wa","a"]].forEach(([id,f])=>$(id).addEventListener("input",e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){S.week[f]=v;save();calcWarn();}}));
+function kmin(n,p,a){for(let k=0;k<=n;k++)if(1-cdf(k-1,n,p)<=a)return k;return null;}
+function calcProof(){
+  const E=S.proof,n=Math.max(1,E.n|0),k=Math.min(n,Math.max(0,E.k|0)),p=Math.min(.99,Math.max(.01,E.p/100)),a=E.a;
+  const pv=1-cdf(k-1,n,p),km=kmin(n,p,a),ph=k/n,z=1.96,den=1+z*z/n,c=(ph+z*z/(2*n))/den,h=z*Math.sqrt(ph*(1-ph)/n+z*z/(4*n*n))/den;
+  $("eRate").textContent=(ph*100).toFixed(1)+"%";$("ePv").textContent=pv<0.001?"<0.001":Math.max(0,pv).toFixed(3);
+  $("eMin").textContent=km===null?"not possible":`${km} of ${n}`;$("eCI").textContent=`${Math.max(0,(c-h)*100).toFixed(0)}–${Math.min(100,(c+h)*100).toFixed(0)}%`;
+  const ok=pv<=a;$("eV").className="verdict "+(ok?"goodv":"badv");
+  $("eV").textContent=ok?`${k} of ${n} meet the standard (${(ph*100).toFixed(0)}%). The sample shows the true rate is above ${Math.round(p*100)}%, so the KR can be signed off on this evidence.`
+    :`${k} of ${n} meet the standard (${(ph*100).toFixed(0)}%). Not enough to show the rate is above ${Math.round(p*100)}%. `+(km===null?"Take a larger sample.":`You need ${km} of ${n}, or a larger sample.`);
+  $("et").tBodies[0].innerHTML=[30,50,75,100,150,200,300,500].map(m=>{const t=kmin(m,p,a);return `<tr${m===n?' class="sel"':""}><td class="n">${m}</td><td class="n">${t??"–"}</td><td class="n">${t!=null?(t/m*100).toFixed(0)+"%":"–"}</td></tr>`;}).join("");
+}
+[["en","n"],["ek","k"],["ep","p"],["ea","a"]].forEach(([id,f])=>$(id).addEventListener("input",e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){S.proof[f]=v;save();calcProof();}}));
+
+/* =================== quick calculator =================== */
+function defSimple(){return {g:[{n:17,p:95},{n:11,p:88},{n:5,p:75}],t:"",risk:{on:true,p:75,keep:85,aff:[false,true,true]}};}
+const QN=["Safe","Likely","At risk"];
+const clone=o=>JSON.parse(JSON.stringify(o));
+function qDist(groups){let dp=[1];
+  groups.forEach(([n,p])=>{for(let j=0;j<n;j++){const nd=new Array(dp.length+1).fill(0);for(let i=0;i<dp.length;i++){nd[i]+=dp[i]*(1-p);nd[i+1]+=dp[i]*p;}dp=nd;}});
+  return dp;}
+function qModel(q){
+  const g=q.g.map(x=>[Math.max(0,Math.min(500,parseInt(x.n)||0)),Math.min(1,Math.max(0,(parseFloat(x.p)||0)/100))]);
+  const N=g.reduce((a,x)=>a+x[0],0);let d=qDist(g);
+  if(q.risk.on){const r=Math.min(1,Math.max(0,q.risk.p/100)),k=Math.min(1,Math.max(0,q.risk.keep/100));
+    const d2=qDist(g.map(([n,p],i)=>[n,q.risk.aff[i]?p*k:p]));d=d.map((v,i)=>r*v+(1-r)*d2[i]);}
+  const mean=d.reduce((a,v,i)=>a+i*v,0),ge=m=>d.slice(Math.max(0,m)).reduce((a,b)=>a+b,0);
+  const qq=x=>{let c=0;for(let i=0;i<=N;i++){c+=d[i];if(c>=x-1e-12)return i;}return N;};
+  return {d,N,mean,ge,q:qq};}
+function qTarget(q,N){const t=parseInt(q.t);return t>0?Math.min(N,t):Math.max(1,Math.ceil(N*0.8-1e-9));}
+function bindQuick(){const q=S.simple;
+  q.g.forEach((g,i)=>{$("qn"+i).value=g.n;$("qp"+i).value=g.p;});
+  $("qTot").value=q.g.reduce((a,g)=>a+(parseInt(g.n)||0),0);
+  $("qt").value=q.t;$("qr").checked=q.risk.on;$("qrBox").hidden=!q.risk.on;$("qrp").value=q.risk.p;$("qrk").value=q.risk.keep;
+  q.risk.aff.forEach((a,i)=>$("qa"+i).checked=a);}
+let qLast=null;
+function calcQuick(){
+  const q=S.simple,m=qModel(q),N=m.N;
+  if(document.activeElement!==$("qTot"))$("qTot").value=N;
+  $("qTotHint").textContent=N?`= ${q.g.map((g,i)=>`${parseInt(g.n)||0} ${QN[i]}`).join(" + ")}. Changing the total resizes the groups in the same mix.`:"Type a total to start. It is split 50% Safe, 35% Likely, 15% At risk until you adjust it.";
+  const ids=["qMean","qT","qAll","qRange"];
+  if(!N){ids.forEach(id=>$(id).textContent="–");$("qAns").textContent=`Type how many ${U()[1]} are in at least one group.`;$("qV").textContent="";$("qWins").innerHTML="";$("qHist").innerHTML="";$("qtHint").textContent="";qLast=null;return;}
+  const t=qTarget(q,N),pt=m.ge(t),pa=m.d[N];
+  $("qtHint").className=parseInt(q.t)>N?"hint bad":"hint";
+  $("qtHint").textContent=parseInt(q.t)>N?`The target (${q.t}) is more than the ${N} ${U()[1]} in the three groups, so it is capped at ${N}. Add them to a group or lower the target.`:parseInt(q.t)>0?"":`Blank, so using 80% of ${N}: ${t} ${U()[1]}.`;
+  $("qAns").innerHTML=`Expect about <strong>${m.mean.toFixed(1)}</strong> of ${N} ${U()[1]}. There is a <strong class="${band(pt)}">${fmtP(pt)}</strong> chance of landing at least ${t}, and a <strong class="${band(pa)}">${fmtP(pa)}</strong> chance of all ${N}.`;
+  $("qMean").textContent=`${m.mean.toFixed(1)} / ${N}`;
+  $("qT").textContent=fmtP(pt);$("qT").className=band(pt);$("qTL").textContent=`chance of at least ${t}`;
+  $("qAll").textContent=fmtP(pa);$("qAll").className=band(pa);$("qAllL").textContent=`chance of all ${N}`;
+  $("qRange").textContent=`${m.q(.1)} – ${m.q(.9)}`;
+  const v=$("qV");
+  v.className="verdict "+(pt>=0.8?"goodv":pt<0.5?"badv":"");
+  v.textContent=pt>=0.9?`Target looks safe. Keep checking weekly and protect the At risk ${U()[1]}.`:
+    pt>=0.8?`Achievable but tight. Protect the At risk ${U()[1]} and escalate blockers early.`:
+    pt>=0.5?`Close to a coin flip. Reword or drop the hardest ${U()[1]}, or agree a lower target now.`:
+    "Unlikely as planned. Change scope or the target now, not in the last month.";
+  drawHist(m.d,t,m.mean,N,$("qHist"));
+  const wins=[];let t90=0;for(let k=1;k<=N;k++)if(m.ge(k)>=0.9)t90=k;
+  wins.push(t90?`A target you can commit to with 90% confidence: <b>${t90} of ${N}</b>.`:`No target reaches 90% confidence with these chances.`);
+  const pts=x=>`${x>=0?"+":""}${Math.round(x*100)} pts`;
+  if((parseInt(q.g[2].n)||0)>0){const q2=clone(q);q2.g[2].n=(parseInt(q2.g[2].n)||0)-1;q2.g[1].n=(parseInt(q2.g[1].n)||0)+1;const v2=qModel(q2).ge(t);
+    wins.push(`Move one ${U()[0]} from At risk to Likely (remove a dependency or reword it): <b>${fmtP(v2)}</b> chance of ${t} (${pts(v2-pt)}).`);}
+  if(q.risk.on){const q3=clone(q);q3.risk.on=false;const v3=qModel(q3).ge(t);wins.push(`Take the shared risk off the table: <b>${fmtP(v3)}</b> chance of ${t} (${pts(v3-pt)}).`);}
+  if(t>1)wins.push(`Lower the target to ${t-1}: <b>${fmtP(m.ge(t-1))}</b> chance.`);
+  if(t<N)wins.push(`Raise the target to ${t+1}: <b>${fmtP(m.ge(t+1))}</b> chance.`);
+  $("qWins").innerHTML=wins.map(w=>`<li>${w}</li>`).join("");
+  qLast={m,t,wins};
+}
+const qSet=(fn)=>e=>{fn(e.target);save();calcQuick();};
+[0,1,2].forEach(i=>{
+  $("qn"+i).addEventListener("input",qSet(el=>S.simple.g[i].n=Math.max(0,parseInt(el.value)||0)));
+  $("qp"+i).addEventListener("input",qSet(el=>{const v=clampPct(el.value);if(v!==null)S.simple.g[i].p=v;}));
+  $("qa"+i).addEventListener("change",qSet(el=>S.simple.risk.aff[i]=el.checked));});
+$("qt").addEventListener("input",qSet(el=>S.simple.t=el.value));
+$("qTot").addEventListener("input",()=>{
+  const T=Math.max(0,Math.min(1500,parseInt($("qTot").value)||0)),g=S.simple.g,N=g.reduce((a,x)=>a+(parseInt(x.n)||0),0);
+  const w=N?g.map(x=>(parseInt(x.n)||0)/N):[0.5,0.35,0.15];
+  const raw=w.map(x=>x*T),fl=raw.map(Math.floor);let rem=T-fl.reduce((a,b)=>a+b,0);
+  raw.map((x,i)=>[x-fl[i],i]).sort((a,b)=>b[0]-a[0]).forEach(([,i])=>{if(rem>0){fl[i]++;rem--;}});
+  fl.forEach((n,i)=>{g[i].n=n;$("qn"+i).value=n;});
+  save();calcQuick();});
+$("qTot").addEventListener("blur",calcQuick);
+$("qr").addEventListener("change",qSet(el=>{S.simple.risk.on=el.checked;$("qrBox").hidden=!el.checked;}));
+$("qrp").addEventListener("input",qSet(el=>{const v=clampPct(el.value);if(v!==null)S.simple.risk.p=v;}));
+$("qrk").addEventListener("input",qSet(el=>{const v=clampPct(el.value);if(v!==null)S.simple.risk.keep=v;}));
+$("qCopy").addEventListener("click",()=>{if(!qLast)return;
+  const tmp=document.createElement("div");tmp.innerHTML=$("qAns").innerHTML+"\n"+$("qV").textContent+"\n"+qLast.wins.map(w=>"- "+w).join("\n");
+  const g=S.simple.g.map((x,i)=>`${QN[i]} ${x.n} at ${x.p}%`).join(", ");
+  copyText(`${S.title}: quick forecast\n${U()[2]}: ${g}\n`+tmp.textContent+`\n(OKR Odds Calculator, built by Surya Gupta)`,$("qText"),"qMsg","Answer copied. Paste it into your email or Teams.");});
+let qArm=null;
+$("qSend").addEventListener("click",()=>{const b=$("qSend");
+  if(!qArm){b.textContent="Replaces the KRs in Completion odds. Click again to confirm";qArm=setTimeout(()=>{qArm=null;b.textContent="Open in full calculator";},5000);return;}
+  clearTimeout(qArm);qArm=null;b.textContent="Open in full calculator";
+  const q=S.simple,rid="r1";S.krs=[];
+  q.g.forEach((g,i)=>{for(let j=1;j<=(parseInt(g.n)||0);j++)S.krs.push({id:["S","L","R"][i]+j,name:`${QN[i]} ${U()[0]} ${j} (rename me)`,p:g.p,alt:null,m:(q.risk.on&&q.risk.aff[i])?{[rid]:q.risk.keep}:{}});});
+  S.risks=q.risk.on?[{id:rid,name:"Shared risk (rename me)",p:q.risk.p,tied:""}]:[];
+  S.target=qTarget(q,S.krs.length);save();drawAll();show("odds");window.scrollTo(0,0);
+  flash("setupMsg","Quick setup moved here. Rename the KRs and fine-tune each chance.");});
+
+/* =================== start =================== */
+bindPlan();header();drawRisks();drawKR();drawPert();bindSmall();calcWarn();calcProof();bindQuick();calcQuick();simulate();
+</script>
+
+</body>
+</html>
